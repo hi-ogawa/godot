@@ -1,0 +1,16 @@
+Import('env')
+
+env.add_source_files(env.modules_sources,"*.cpp")
+
+sources = [
+    "register_types.cpp",
+    "hello.cpp"
+]
+
+module_env = env.Clone()
+module_env.Append(CXXFLAGS='-fPIC')
+module_env['LIBS'] = []
+
+shared_lib = module_env.SharedLibrary(target='#bin/hello', source=sources)
+env.Append(LIBS=shared_lib)
+env.Append(LIBPATH='#bin')
