@@ -72,7 +72,7 @@ class VideoPlayer : public Control {
 	int audio_track;
 	int bus_index;
 
-	
+
 	StringName bus;
 
 	void _mix_audio() ;

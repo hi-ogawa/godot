@@ -51,10 +51,12 @@ bool VideoPlayer::mix(AudioFrame *p_buffer, int p_frames) {
 	return false;
 }
 
+// Called from main thread (eg VideoStreamPlaybackWebm::update)
 int VideoPlayer::_audio_mix_callback(void *p_udata, const float *p_data, int p_frames) {
+
 	VideoPlayer *vp = (VideoPlayer *)p_udata;
 
-	int todo = MIN(vp->resampler.get_todo(), p_frames);
+	int todo = MIN(vp->resampler.get_writer_space(), p_frames);
 
 	float *wb = vp->resampler.get_write_buffer();
 	int c = vp->resampler.get_channel_count();
@@ -64,30 +66,29 @@ int VideoPlayer::_audio_mix_callback(void *p_udata, const float *p_data, int p_f
 	}
 	vp->resampler.write(todo);
 
-	OS::get_singleton()->print("Audio p_frames: %d, todo: %d\n", p_frames, todo);
-
 	return todo;
 }
 
+// Called from audio thread
 void VideoPlayer::_mix_audio() {
 
 	if (!stream.is_valid()) {
 		return;
 	}
-	if (!playback->is_playing()) {
+	if (!playback.is_valid() || !playback->is_playing()) {
 		return;
 	}
-	//get data
+
 	AudioFrame *buffer = mix_buffer.ptr();
 	int buffer_size = mix_buffer.size();
 
-	//mix
+	// Resample
 	if(!mix(buffer, buffer_size))
 		return;
 
-	//mix!
 	AudioFrame vol = AudioFrame(volume,volume);
 
+	// Copy to server's audio buffer
 	switch (AudioServer::get_singleton()->get_speaker_mode()) {
 
 		case AudioServer::SPEAKER_MODE_STEREO: {
@@ -131,8 +132,6 @@ void VideoPlayer::_mix_audio() {
 
 		} break;
 	}
-
-
 }
 
 
@@ -150,15 +149,16 @@ void VideoPlayer::_notification(int p_notification) {
 
 		} break;
 
-		case NOTIFICATION_EXIT_TREE:
-		{
+		case NOTIFICATION_EXIT_TREE: {
+
 			AudioServer::get_singleton()->remove_callback(_mix_audios, this);
-		}break;
+
+		} break;
 
 		case NOTIFICATION_INTERNAL_PROCESS: {
 
 			bus_index = AudioServer::get_singleton()->thread_find_bus_index(bus);
-			
+
 			if (stream.is_null())
 				return;
 			if (paused)
@@ -166,10 +166,11 @@ void VideoPlayer::_notification(int p_notification) {
 			if (!playback->is_playing())
 				return;
 
-			double audio_time = USEC_TO_SEC(OS::get_singleton()->get_ticks_usec()); 
+			double audio_time = USEC_TO_SEC(OS::get_singleton()->get_ticks_usec());
 
 			double delta = last_audio_time == 0 ? 0 : audio_time - last_audio_time;
 			last_audio_time = audio_time;
+
 			if (delta == 0)
 				return;
 
@@ -471,7 +472,7 @@ VideoPlayer::VideoPlayer() {
 
 	audio_track = 0;
 
-	buffering_ms = 5000;
+	buffering_ms = 500;
 	server_mix_rate = 44100;
 
 	//	internal_stream.player=this;

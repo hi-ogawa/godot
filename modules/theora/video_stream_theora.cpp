@@ -406,12 +406,11 @@ void VideoStreamPlaybackTheora::update(float p_delta) {
 
 		ogg_packet op;
 		bool no_theora = false;
+		bool buffer_full = false;
 
-		while (vorbis_p) {
+		while (vorbis_p && !audio_done && !buffer_full) {
 			int ret;
 			float **pcm;
-
-			bool buffer_full = false;
 
 			/* if there's pending, decoded audio, grab it */
 			ret = vorbis_synthesis_pcmout(&vd, &pcm);
@@ -738,4 +737,3 @@ void VideoStreamTheora::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::STRING, "file", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), "set_file", "get_file");
 
 }
-

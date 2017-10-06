@@ -93,19 +93,19 @@ private:
 
 VideoStreamPlaybackWebm::VideoStreamPlaybackWebm()
 	: audio_track(0),
-	  webm(NULL),
-	  video(NULL),
-	  audio(NULL),
-	  video_frames(NULL), audio_frame(NULL),
-	  video_frames_pos(0), video_frames_capacity(0),
-	  num_decoded_samples(0), samples_offset(-1),
-	  mix_callback(NULL),
-	  mix_udata(NULL),
-	  playing(false), paused(false),
-	  delay_compensation(0.0),
-	  time(0.0), video_frame_delay(0.0), video_pos(0.0),
-	  texture(memnew(ImageTexture)),
-	  pcm(NULL) {}
+		webm(NULL),
+		video(NULL),
+		audio(NULL),
+		video_frames(NULL), audio_frame(NULL),
+		video_frames_pos(0), video_frames_capacity(0),
+		num_decoded_samples(0), samples_offset(-1),
+		mix_callback(NULL),
+		mix_udata(NULL),
+		playing(false), paused(false),
+		delay_compensation(0.0),
+		time(0.0), video_frame_delay(0.0), video_pos(0.0),
+		texture(memnew(ImageTexture)),
+		pcm(NULL) {}
 VideoStreamPlaybackWebm::~VideoStreamPlaybackWebm() {
 
 	delete_pointers();
@@ -171,7 +171,6 @@ void VideoStreamPlaybackWebm::stop() {
 void VideoStreamPlaybackWebm::play() {
 
 	stop();
-
 
 	delay_compensation = ProjectSettings::get_singleton()->get("audio/video_delay_compensation_ms");
 	delay_compensation /= 1000.0;
@@ -252,14 +251,15 @@ void VideoStreamPlaybackWebm::update(float p_delta) {
 	}
 
 	const bool hasAudio = (audio && mix_callback);
-	while ((hasAudio && (!audio_buffer_full || !has_enough_video_frames())) || (!hasAudio && video_frames_pos == 0)) {
+	while ((hasAudio && !audio_buffer_full && !has_enough_video_frames()) ||
+				 (!hasAudio && video_frames_pos == 0)) {
 
-		if (hasAudio && !audio_buffer_full && audio_frame->isValid() && audio->getPCMS(*audio_frame, pcm, num_decoded_samples) && num_decoded_samples > 0) {
+		if (hasAudio && !audio_buffer_full && audio_frame->isValid() &&
+				audio->getPCMS(*audio_frame, pcm, num_decoded_samples) && num_decoded_samples > 0) {
 
 			const int mixed = mix_callback(mix_udata, pcm, num_decoded_samples);
 
 			if (mixed != num_decoded_samples) {
-
 				samples_offset = mixed;
 				audio_buffer_full = true;
 			}
@@ -287,6 +287,7 @@ void VideoStreamPlaybackWebm::update(float p_delta) {
 	while (video_frames_pos > 0 && !want_this_frame) {
 
 		WebMFrame *video_frame = video_frames[0];
+
 		if (video_frame->time <= time + video_delay) {
 
 			if (video->decode(*video_frame)) {
@@ -326,13 +327,11 @@ void VideoStreamPlaybackWebm::update(float p_delta) {
 								// 								converted = true;
 							}
 
-							if (converted)
-							{
+							if (converted) {
 								Ref<Image> img = memnew(Image(image.w, image.h, 0, Image::FORMAT_RGBA8, frame_data));
 								texture->set_data(img); //Zero copy send to visual server
 							}
 						}
-
 						break;
 					}
 				}

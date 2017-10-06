@@ -59,189 +59,83 @@ float InterpolateHermite4pt3oX(float x0, float x1, float x2, float x3, float t)
 	return (((((c3 * t) + c2) * t) + c1) * t) + c0;
 }
 
-uint32_t AudioRBResampler::copy_stereo(AudioFrame *dest, int count)
-{
-	int32_t read = 0;
-	int32_t pos = rb_read_pos;
-	while(read < count)
-	{
-		dest[read] = AudioFrame(rb[pos],rb[(pos+1) & rb_mask]);
-		pos = (pos + 2) & rb_mask;
-		++read;
-
-	}
-}
-
-
+// Linear interpolation based sample rate convertion (low quality)
+// Note that AudioStreamPlaybackResampled::mix has better algorithm,
+// but it wan't obvious to integrate that with VideoPlayer
 template <int C>
-uint32_t AudioRBResampler::_resample(AudioFrame *p_dest, int p_todo) {
+uint32_t AudioRBResampler::_resample(AudioFrame *p_dest, int p_todo, int32_t p_increment) {
 
 	uint32_t read = offset & MIX_FRAC_MASK;
 
-	float ratio = float(target_mix_rate) / float(src_mix_rate);
-	int frames_to_skip = int(ratio);
-	int steps = int(1.0f/ratio);
-	int step = 0;
-
-	float mu = ratio;
-	float mu_increment = ratio;
-
-	uint32_t pos = rb_read_pos;
-
-	OS::get_singleton()->print("Resample p_todo: %d, ratio: %f, target_rate: %d, src_rate: %d\n", p_todo, ratio, target_mix_rate, src_mix_rate);
-
-	uint32_t a_index, b_index, c_index, d_index;
-
 	for (int i = 0; i < p_todo; i++) {
 
-		mu = ratio + mu_increment*step;
-		
-		if (mu>=1)
-		{
-			pos += frames_to_skip + 1;
-			mu = ratio;
-			step = 0;
-		}
-
-		++step;
+		offset = (offset + p_increment) & (((1 << (rb_bits + MIX_FRAC_BITS)) - 1));
+		read += p_increment;
+		uint32_t pos = offset >> MIX_FRAC_BITS;
+		float frac = float(offset & MIX_FRAC_MASK) / float(MIX_FRAC_LEN);
+		ERR_FAIL_COND_V(pos >= rb_len, 0);
+		uint32_t pos_next = (pos + 1) & rb_mask;
 
 		// since this is a template with a known compile time value (C), conditionals go away when compiling.
 		if (C == 1) {
 
-			if (pos == 0)
-				a_index = 0;
-			else
-				a_index = (pos - C ) & rb_mask;
-			
-			if ( Math::abs(rb_read_pos-rb_write_pos) > (2*C))
-			{
-				c_index = (pos + C) & rb_mask;
-				d_index = (pos + (2*C)) & rb_mask;
-			}
-			else
-			{
-				c_index = pos;
-				d_index = pos;
-			}
-
-			float a = rb[a_index];
-			float b = rb[b_index];
-			float c = rb[c_index];
-			float d = rb[d_index];
-
-			p_dest[i] =  AudioFrame(0,0)+InterpolateHermite4pt3oX(a,b,c,d, mu);
-
+			float v0 = rb[pos];
+			float v0n = rb[pos_next];
+			v0 += (v0n - v0) * frac;
+			p_dest[i] = AudioFrame(v0, v0);
 		}
+
 		if (C == 2) {
 
-			b_index = pos;
+			float v0 = rb[(pos << 1) + 0];
+			float v1 = rb[(pos << 1) + 1];
+			float v0n = rb[(pos_next << 1) + 0];
+			float v1n = rb[(pos_next << 1) + 1];
 
-			if (pos == 0)
-				a_index = 0;
-			else
-				a_index = (pos - C ) & rb_mask;
-			
-			if ( Math::abs(rb_read_pos-rb_write_pos) > (2*C))
-			{
-				c_index = (pos + C) & rb_mask;
-				d_index = (pos + (2*C)) & rb_mask;
-			}
-			else
-			{
-				c_index = pos;
-				d_index = pos;
-			}
-			// OS::get_singleton()->print("Resample a_index: %d b_index %d c_index %d d_index %d\n", a_index, b_index, c_index, d_index);
-			AudioFrame a = AudioFrame(rb[a_index], rb[a_index+1]);
-			AudioFrame b = AudioFrame(rb[b_index], rb[b_index+1]);
-			AudioFrame c = AudioFrame(rb[c_index], rb[c_index+1]);
-			AudioFrame d = AudioFrame(rb[d_index], rb[d_index+1]);
-
-			p_dest[i*C] = InterpolateHermite4pt3oX(a,b,c,d, mu);
-
+			v0 += (v0n - v0) * frac;
+			v1 += (v1n - v1) * frac;
+			p_dest[i] = AudioFrame(v0, v1);
 		}
 
+		// For now, channels higher than stereo are almost ignored
 		if (C == 4) {
 
-			if (pos == 0)
-				a_index = 0;
-			else
-				a_index = (pos - C ) & rb_mask;
-			
-			if ( Math::abs(rb_read_pos-rb_write_pos) > (2*C))
-			{
-				c_index = (pos + C) & rb_mask;
-				d_index = (pos + (2*C)) & rb_mask;
-			}
-			else
-			{
-				c_index = pos;
-				d_index = pos;
-			}
+			float v0 = rb[(pos << 2) + 0];
+			float v1 = rb[(pos << 2) + 1];
+			float v2 = rb[(pos << 2) + 2];
+			float v3 = rb[(pos << 2) + 3];
+			float v0n = rb[(pos_next << 2) + 0];
+			float v1n = rb[(pos_next << 2) + 1];
+			float v2n = rb[(pos_next << 2) + 2];
+			float v3n = rb[(pos_next << 2) + 3];
 
-			AudioFrame a = AudioFrame(rb[a_index+0], rb[a_index+1]);
-			AudioFrame b = AudioFrame(rb[b_index+0], rb[b_index+1]);
-			AudioFrame c = AudioFrame(rb[c_index+0], rb[c_index+1]);
-			AudioFrame d = AudioFrame(rb[d_index+0], rb[d_index+1]);
-
-			p_dest[(i*C)+0] = InterpolateHermite4pt3oX(a,b,c,d, mu);
-
-			a = AudioFrame(rb[a_index+2], rb[a_index+3]);
-			b = AudioFrame(rb[b_index+2], rb[b_index+3]);
-			c = AudioFrame(rb[c_index+2], rb[c_index+3]);
-			d = AudioFrame(rb[d_index+2], rb[d_index+3]);
-
-			p_dest[(i*C)+1] = InterpolateHermite4pt3oX(a,b,c,d, mu);
-
+			v0 += (v0n - v0) * frac;
+			v1 += (v1n - v1) * frac;
+			v2 += (v2n - v2) * frac;
+			v3 += (v3n - v3) * frac;
+			p_dest[i] = AudioFrame(v0, v1);
 		}
 
 		if (C == 6) {
 
-			if (pos == 0)
-				a_index = 0;
-			else
-				a_index = (pos - C ) & rb_mask;
-			
-			if ( Math::abs(rb_read_pos-rb_write_pos) > (2*C))
-			{
-				c_index = (pos + C) & rb_mask;
-				d_index = (pos + (2*C)) & rb_mask;
-			}
-			else
-			{
-				c_index = pos;
-				d_index = pos;
-			}
+			float v0 = rb[(pos * 6) + 0];
+			float v1 = rb[(pos * 6) + 1];
+			float v2 = rb[(pos * 6) + 2];
+			float v3 = rb[(pos * 6) + 3];
+			float v4 = rb[(pos * 6) + 4];
+			float v5 = rb[(pos * 6) + 5];
+			float v0n = rb[(pos_next * 6) + 0];
+			float v1n = rb[(pos_next * 6) + 1];
+			float v2n = rb[(pos_next * 6) + 2];
+			float v3n = rb[(pos_next * 6) + 3];
+			float v4n = rb[(pos_next * 6) + 4];
+			float v5n = rb[(pos_next * 6) + 5];
 
-			AudioFrame a = AudioFrame(rb[a_index+0], rb[a_index+1]);
-			AudioFrame b = AudioFrame(rb[b_index+0], rb[b_index+1]);
-			AudioFrame c = AudioFrame(rb[c_index+0], rb[c_index+1]);
-			AudioFrame d = AudioFrame(rb[d_index+0], rb[d_index+1]);
-
-			p_dest[(i*C)+0] = InterpolateHermite4pt3oX(a,b,c,d, mu);
-
-			a = AudioFrame(rb[a_index+2], rb[a_index+3]);
-			b = AudioFrame(rb[b_index+2], rb[b_index+3]);
-			c = AudioFrame(rb[c_index+2], rb[c_index+3]);
-			d = AudioFrame(rb[d_index+2], rb[d_index+3]);
-
-			p_dest[(i*C)+1] = InterpolateHermite4pt3oX(a,b,c,d, mu);
-
-			a = AudioFrame(rb[a_index+4], rb[a_index+5]);
-			b = AudioFrame(rb[b_index+4], rb[b_index+5]);
-			c = AudioFrame(rb[c_index+4], rb[c_index+5]);
-			d = AudioFrame(rb[d_index+4], rb[d_index+5]);
-
-			p_dest[(i*C)+2] = InterpolateHermite4pt3oX(a,b,c,d, mu);
-
-			
+			p_dest[i] = AudioFrame(v0, v1);
 		}
-		read+=C;
 	}
 
-	OS::get_singleton()->print("Resample fillled the requsted frames");
-
-	return read ; //rb_read_pos=offset>>MIX_FRAC_BITS;
+	return read >> MIX_FRAC_BITS; //rb_read_pos = offset >> MIX_FRAC_BITS;
 }
 
 bool AudioRBResampler::mix(AudioFrame *p_dest, int p_frames) {
@@ -249,63 +143,42 @@ bool AudioRBResampler::mix(AudioFrame *p_dest, int p_frames) {
 	if (!rb)
 		return false;
 
-	int write_pos_cache = rb_write_pos;
-
 	int32_t increment = (src_mix_rate * MIX_FRAC_LEN) / target_mix_rate;
 
-	int rb_todo;
+	int read_space = get_reader_space();
 
-	if (write_pos_cache == rb_read_pos) {
-		return false; //out of buffer
-
-	} else if (rb_read_pos < write_pos_cache) {
-
-		rb_todo = write_pos_cache - rb_read_pos; //-1?
-	} else {
-
-		rb_todo = (rb_len - rb_read_pos) + write_pos_cache; //-1?
+	if (read_space == 0) {
+		// Writer is slow or there's nothing to read
+		return false;
 	}
 
-	int todo = MIN(((int64_t(rb_todo) << MIX_FRAC_BITS) / increment) + 1, p_frames);
+	int target_todo = MIN(((int64_t(read_space) << MIX_FRAC_BITS) / increment) + 1, p_frames);
+
 	{
-		int read = 0;
-		// switch (channels) {
-		// 	case 1: read = _resample<1>(p_dest, todo); break;
-		// 	case 2: read = _resample<2>(p_dest, todo); break;
-		// 	case 4: read = _resample<4>(p_dest, todo); break;
-		// 	case 6: read = _resample<6>(p_dest, todo); break;
-		// }
-		read = copy_stereo(p_dest, todo);
+		int src_read = 0;
+		switch (channels) {
+			case 1: src_read = _resample<1>(p_dest, target_todo, increment); break;
+			case 2: src_read = _resample<2>(p_dest, target_todo, increment); break;
+			case 4: src_read = _resample<4>(p_dest, target_todo, increment); break;
+			case 6: src_read = _resample<6>(p_dest, target_todo, increment); break;
+		}
 
-		OS::get_singleton()->print("todo: %d rb_todo: %d increment: %d p_frames: %d read: %d channels: %d\n", todo, rb_todo, increment, p_frames, read, channels);
+		if (src_read > read_space)
+			src_read = read_space;
 
-		//end of stream, fadeout
-		int remaining = p_frames - todo;
-		if (remaining && todo > 0) {
+		rb_read_pos = (rb_read_pos + src_read) & rb_mask;
 
-			//print_line("fadeout");
-			for (uint32_t c = 0; c < channels; c++) {
-
-				for (int i = 0; i < todo; i++) {
-
-					AudioFrame samp = p_dest[i * channels + c];
-					float mul = float(i)/float(todo);
-					
-					p_dest[i * channels + c] = samp * mul;
-				}
+		// Create fadeout effect for the end of stream (note that it can be because of slow writer)
+		if (p_frames - target_todo > 0) {
+			for (int i = 0; i < target_todo; i++) {
+				p_dest[i] = p_dest[i] * float(target_todo - i) / float(target_todo);
 			}
 		}
 
-		//zero out what remains there to avoid glitches
-		for (uint32_t i = todo * channels; i < int(p_frames) * channels; i++) {
-
-			p_dest[i] = AudioFrame(0,0);
+		// Fill zeros (silence) for the rest of frames
+		for (uint32_t i = target_todo; i < p_frames; i++) {
+			p_dest[i] = AudioFrame(0, 0);
 		}
-
-		if (read > rb_todo)
-			read = rb_todo;
-
-		rb_read_pos = (rb_read_pos + read) & rb_mask;
 	}
 
 	return true;
@@ -315,13 +188,11 @@ Error AudioRBResampler::setup(int p_channels, int p_src_mix_rate, int p_target_m
 
 	ERR_FAIL_COND_V(p_channels != 1 && p_channels != 2 && p_channels != 4 && p_channels != 6, ERR_INVALID_PARAMETER);
 
-	//float buffering_sec = int(GLOBAL_DEF("audio/stream_buffering_ms",500))/1000.0;
 	int desired_rb_bits = nearest_shift(MAX((p_buffer_msec / 1000.0) * p_src_mix_rate, p_minbuff_needed));
 
 	bool recreate = !rb;
 
 	if (rb && (uint32_t(desired_rb_bits) != rb_bits || channels != uint32_t(p_channels))) {
-		//recreate
 
 		memdelete_arr(rb);
 		memdelete_arr(read_buf);
@@ -350,10 +221,6 @@ Error AudioRBResampler::setup(int p_channels, int p_src_mix_rate, int p_target_m
 		rb[i] = 0;
 		read_buf[i] = 0;
 	}
-
-
-		OS::get_singleton()->print("RB SETUP: msec: %d, array-length-frames: %d, array-length-floats: %d\n", p_buffer_msec, rb_len, rb_len * p_channels);
-
 
 	return OK;
 }

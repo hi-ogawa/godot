@@ -57,11 +57,8 @@ struct AudioRBResampler {
 	float *read_buf;
 	float *rb;
 
-
-	uint32_t copy_stereo(AudioFrame *dest, int count);
-
 	template <int C>
-	uint32_t _resample(AudioFrame *p_dest, int p_todo);
+	uint32_t _resample(AudioFrame *p_dest, int p_todo, int32_t p_increment);
 
 public:
 	_FORCE_INLINE_ void flush() {
@@ -75,26 +72,41 @@ public:
 	}
 
 	_FORCE_INLINE_ int get_total() const {
-
 		return rb_len - 1;
 	}
 
-	_FORCE_INLINE_ int get_todo() const { //return amount of frames to mix
+	_FORCE_INLINE_ int get_writer_space() const {
+		int space, r, w;
 
-		int todo;
-		int read_pos_cache = rb_read_pos;
+		r = rb_read_pos;
+		w = rb_write_pos;
 
-		if (read_pos_cache == rb_write_pos) {
-			todo = rb_len - 1;
-		} else if (read_pos_cache > rb_write_pos) {
-
-			todo = read_pos_cache - rb_write_pos - 1;
+		if (r == w) {
+			space = rb_len - 1;
+		} else if (w < r) {
+			space = r - w - 1;
 		} else {
-
-			todo = (rb_len - rb_write_pos) + read_pos_cache - 1;
+			space = (rb_len - r) + w - 1;
 		}
 
-		return todo;
+		return space;
+	}
+
+	_FORCE_INLINE_ int get_reader_space() const {
+		int space, r, w;
+
+		r = rb_read_pos;
+		w = rb_write_pos;
+
+		if (r == w) {
+			space = 0;
+		} else if (w < r) {
+			space = rb_len - r + w;
+		} else {
+			space = w - r;
+		}
+
+		return space;
 	}
 
 	_FORCE_INLINE_ bool has_data() const {
