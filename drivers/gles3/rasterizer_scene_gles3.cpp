@@ -179,6 +179,59 @@ void RasterizerSceneGLES3::shadow_atlas_set_size(RID p_atlas, int p_size) {
 	}
 }
 
+// Export shadow map texture as png
+// learnt from EditorNode::_save_scene_with_preview and RasterizerStorageGLES3::texture_get_data
+void RasterizerSceneGLES3::shadow_atlas_debug_export(RID p_atlas) {
+	ShadowAtlas *shadow_atlas = shadow_atlas_owner.getornull(p_atlas);
+
+#ifdef GLES_OVER_GL
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, shadow_atlas->depth);
+
+	PoolVector<uint8_t> data;
+	int data_size;
+	PoolVector<uint8_t>::Write wb;
+
+	int mipmap = 0;
+	bool mipmap_bool = false;
+	Image::Format format = Image::FORMAT_RGBA8;
+
+	data_size = Image::get_image_data_size(shadow_atlas->size, shadow_atlas->size, format, mipmap);
+	data.resize(data_size * 2);
+	wb = data.write();
+
+	glGetTexImage(GL_TEXTURE_2D, mipmap, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, &wb[0]);
+
+	wb = PoolVector<uint8_t>::Write();
+	data.resize(data_size);
+
+	Image *img = memnew(Image(shadow_atlas->size, shadow_atlas->size, mipmap_bool, format, data));
+
+	img->convert(Image::FORMAT_RGB8);
+	img->resize(600, 400);
+
+	OS::Date date = OS::get_singleton()->get_date();
+	OS::Time time = OS::get_singleton()->get_time();
+
+	String path_format = "user://shadow_map__%04d_%02d_%02d__%02d_%02d_%02d.png";
+	OS::get_singleton()->get_ticks_msec();
+	Array path_values;
+	path_values.push_back(date.year);
+	path_values.push_back(date.month);
+	path_values.push_back(date.day);
+	path_values.push_back(time.hour);
+	path_values.push_back(time.min);
+	path_values.push_back(time.sec);
+	bool error = false;
+	String path = path_format.sprintf(path_values, &error);
+
+	img->save_png(path);
+
+#else
+	// Unsupported in GLES
+#endif
+}
+
 void RasterizerSceneGLES3::shadow_atlas_set_quadrant_subdivision(RID p_atlas, int p_quadrant, int p_subdivision) {
 
 	ShadowAtlas *shadow_atlas = shadow_atlas_owner.getornull(p_atlas);
@@ -4508,6 +4561,10 @@ void RasterizerSceneGLES3::render_shadow(RID p_light, RID p_shadow_atlas, int p_
 		width = shadow_size;
 		height = shadow_size;
 
+		OS::get_singleton()->print("SHADOW MAP RENDER: "
+				"fbo: %d, vp_height: %d, x: %d, y: %d, width: %d, height: %d\n",
+				fbo, vp_height, x, y, width, height);
+
 		if (light->type == VS::LIGHT_OMNI) {
 
 			if (light->omni_shadow_mode == VS::LIGHT_OMNI_SHADOW_CUBE) {
@@ -4606,6 +4663,7 @@ void RasterizerSceneGLES3::render_shadow(RID p_light, RID p_shadow_atlas, int p_
 		flip_facing = !flip_facing;
 	}
 	_render_list(render_list.elements, render_list.element_count, light_transform, light_projection, 0, flip_facing, false, true, false, false);
+	shadow_atlas_debug_export(p_shadow_atlas);
 
 	state.scene_shader.set_conditional(SceneShaderGLES3::RENDER_DEPTH, false);
 	state.scene_shader.set_conditional(SceneShaderGLES3::RENDER_DEPTH_DUAL_PARABOLOID, false);

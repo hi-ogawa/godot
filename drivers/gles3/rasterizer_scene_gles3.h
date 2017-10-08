@@ -253,6 +253,7 @@ public:
 	RID_Owner<ShadowAtlas> shadow_atlas_owner;
 
 	RID shadow_atlas_create();
+	void shadow_atlas_debug_export(RID p_atlas);
 	void shadow_atlas_set_size(RID p_atlas, int p_size);
 	void shadow_atlas_set_quadrant_subdivision(RID p_atlas, int p_quadrant, int p_subdivision);
 	bool _shadow_atlas_find_shadow(ShadowAtlas *shadow_atlas, int *p_in_quadrants, int p_quadrant_count, int p_current_subdiv, uint64_t p_tick, int &r_quadrant, int &r_shadow);
