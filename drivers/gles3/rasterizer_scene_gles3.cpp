@@ -4561,10 +4561,6 @@ void RasterizerSceneGLES3::render_shadow(RID p_light, RID p_shadow_atlas, int p_
 		width = shadow_size;
 		height = shadow_size;
 
-		OS::get_singleton()->print("SHADOW MAP RENDER: "
-				"fbo: %d, vp_height: %d, x: %d, y: %d, width: %d, height: %d\n",
-				fbo, vp_height, x, y, width, height);
-
 		if (light->type == VS::LIGHT_OMNI) {
 
 			if (light->omni_shadow_mode == VS::LIGHT_OMNI_SHADOW_CUBE) {
@@ -4662,6 +4658,21 @@ void RasterizerSceneGLES3::render_shadow(RID p_light, RID p_shadow_atlas, int p_
 	if (light->reverse_cull) {
 		flip_facing = !flip_facing;
 	}
+
+	OS::get_singleton()->print("SHADOW MAP RENDER: "
+			"fbo: %d, x: %d, y: %d, width: %d, height: %d\n",
+			fbo, x, y, width, height);
+
+	OS::get_singleton()->print("SHADOW MAP RENDER transform: %s\n",
+      String(light_transform).ascii().get_data());
+
+	OS::get_singleton()->print("SHADOW MAP RENDER projection: %s\n",
+      String(light_projection).ascii().get_data());
+
+	OS::get_singleton()->print("SHADOW MAP RENDER: "
+      "bias: %f, normal_bias: %f, dp_direction: %f, zfar: %f, flip_facing: %d\n",
+      bias, normal_bias, dp_direction, zfar, flip_facing);
+
 	_render_list(render_list.elements, render_list.element_count, light_transform, light_projection, 0, flip_facing, false, true, false, false);
 	shadow_atlas_debug_export(p_shadow_atlas);
 
