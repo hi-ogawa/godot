@@ -585,6 +585,8 @@ void VisualServerScene::instance_set_visible(RID p_instance, bool p_visible) {
 
 		} break;
 	}
+
+  _instance_queue_update(instance, false, false);
 }
 
 void VisualServerScene::instance_attach_skeleton(RID p_instance, RID p_skeleton) {
