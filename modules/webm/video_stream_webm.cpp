@@ -250,6 +250,9 @@ void VideoStreamPlaybackWebm::update(float p_delta) {
 		}
 	}
 
+  // TODO:
+  // - somehow it finishes off before the real end of the video
+  // - after pause and unpause, there will be some delay on audio playback
 	const bool hasAudio = (audio && mix_callback);
 	while ((hasAudio && !audio_buffer_full && !has_enough_video_frames()) ||
 				 (!hasAudio && video_frames_pos == 0)) {
