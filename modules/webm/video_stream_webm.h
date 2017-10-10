@@ -96,6 +96,7 @@ public:
 
 private:
 	inline bool has_enough_video_frames() const;
+	bool should_process(WebMFrame &video_frame);
 
 	void delete_pointers();
 };
