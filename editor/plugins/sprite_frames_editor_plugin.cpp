@@ -44,9 +44,9 @@ void SpriteFramesEditor::_notification(int p_what) {
 
 	if (p_what == NOTIFICATION_ENTER_TREE) {
 		load->set_icon(get_icon("Folder", "EditorIcons"));
-		_delete->set_icon(get_icon("Del", "EditorIcons"));
+		_delete->set_icon(get_icon("Remove", "EditorIcons"));
 		new_anim->set_icon(get_icon("New", "EditorIcons"));
-		remove_anim->set_icon(get_icon("Del", "EditorIcons"));
+		remove_anim->set_icon(get_icon("Remove", "EditorIcons"));
 	}
 
 	if (p_what == NOTIFICATION_READY) {
