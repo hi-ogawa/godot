@@ -510,6 +510,7 @@ public:
 
 	void set_texture(TextureParam p_param, const Ref<Texture> &p_texture);
 	Ref<Texture> get_texture(TextureParam p_param) const;
+	void update_texture(const Ref<Texture> &p_texture);
 
 	void set_feature(Feature p_feature, bool p_enabled);
 	bool get_feature(Feature p_feature) const;

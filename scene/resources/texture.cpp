@@ -74,6 +74,7 @@ void Texture::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("draw_rect", "canvas_item", "rect", "tile", "modulate", "transpose", "normal_map"), &Texture::draw_rect, DEFVAL(Color(1, 1, 1)), DEFVAL(false), DEFVAL(Variant()));
 	ClassDB::bind_method(D_METHOD("draw_rect_region", "canvas_item", "rect", "src_rect", "modulate", "transpose", "normal_map", "clip_uv"), &Texture::draw_rect_region, DEFVAL(Color(1, 1, 1)), DEFVAL(false), DEFVAL(Variant()), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("get_data"), &Texture::get_data);
+	ADD_SIGNAL(MethodInfo("texture_rid_changed", PropertyInfo(Variant::OBJECT, "texture")));
 
 	BIND_ENUM_CONSTANT(FLAG_MIPMAPS);
 	BIND_ENUM_CONSTANT(FLAG_REPEAT);

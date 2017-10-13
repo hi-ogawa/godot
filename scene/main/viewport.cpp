@@ -69,6 +69,7 @@ void ViewportTexture::setup_local_to_scene() {
 	ERR_FAIL_COND(!vp);
 
 	vp->viewport_textures.insert(this);
+	emit_signal("texture_rid_changed", Ref<Texture>(this));
 }
 
 void ViewportTexture::set_viewport_path_in_scene(const NodePath &p_path) {

@@ -1231,9 +1231,23 @@ bool SpatialMaterial::get_feature(Feature p_feature) const {
 void SpatialMaterial::set_texture(TextureParam p_param, const Ref<Texture> &p_texture) {
 
 	ERR_FAIL_INDEX(p_param, TEXTURE_MAX);
+	if (textures[p_param].is_valid())
+		textures[p_param]->disconnect("texture_rid_changed", this, "update_texture");
 	textures[p_param] = p_texture;
+	if (textures[p_param].is_valid())
+		textures[p_param]->connect("texture_rid_changed", this, "update_texture");
+
 	RID rid = p_texture.is_valid() ? p_texture->get_rid() : RID();
 	VS::get_singleton()->material_set_param(_get_material(), shader_names->texture_names[p_param], rid);
+}
+
+void SpatialMaterial::update_texture(const Ref<Texture> &p_texture) {
+	for (int i = 0; i < TEXTURE_MAX; i++) {
+		if (textures[i] == p_texture) {
+			VS::get_singleton()->material_set_param(_get_material(),
+					shader_names->texture_names[i], p_texture->get_rid());
+		}
+	}
 }
 
 Ref<Texture> SpatialMaterial::get_texture(TextureParam p_param) const {
@@ -1795,6 +1809,7 @@ void SpatialMaterial::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_distance_fade_min_distance", "distance"), &SpatialMaterial::set_distance_fade_min_distance);
 	ClassDB::bind_method(D_METHOD("get_distance_fade_min_distance"), &SpatialMaterial::get_distance_fade_min_distance);
+	ClassDB::bind_method(D_METHOD("update_texture", "texture"), &SpatialMaterial::update_texture);
 
 	ADD_GROUP("Flags", "flags_");
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "flags_transparent"), "set_feature", "get_feature", FEATURE_TRANSPARENT);
