@@ -73,7 +73,7 @@ void ViewportTexture::setup_local_to_scene() {
 
 void ViewportTexture::set_viewport_path_in_scene(const NodePath &p_path) {
 
-	if (path == p_path)
+	if (path == p_path && vp)
 		return;
 
 	path = p_path;

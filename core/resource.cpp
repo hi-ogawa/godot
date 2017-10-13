@@ -184,6 +184,28 @@ Ref<Resource> Resource::duplicate_for_local_scene(Node *p_for_scene, Map<Ref<Res
 	return Ref<Resource>(r);
 }
 
+void Resource::set_local_scene(Node *p_scene, Map<Ref<Resource>, Ref<Resource> > &remap_cache) {
+	local_scene = p_scene;
+
+	List<PropertyInfo> plist;
+	get_property_list(&plist);
+	for (List<PropertyInfo>::Element *E = plist.front(); E; E = E->next()) {
+		if (!(E->get().usage & PROPERTY_USAGE_STORAGE))
+			continue;
+		Variant p = get(E->get().name);
+		if (p.get_type() == Variant::OBJECT) {
+			RES child_resource = p;
+			if (child_resource.is_valid() && child_resource->local_to_scene) {
+				if (!remap_cache.has(child_resource)) {
+					child_resource->set_local_scene(p_scene, remap_cache);
+					remap_cache[child_resource] = child_resource;
+				}
+			}
+		}
+		set(E->get().name, p);
+	}
+}
+
 Ref<Resource> Resource::duplicate(bool p_subresources) const {
 
 	List<PropertyInfo> plist;
@@ -277,8 +299,23 @@ void Resource::set_local_to_scene(bool p_enable) {
 }
 
 bool Resource::is_local_to_scene() const {
+	if (local_to_scene)
+		return true;
 
-	return local_to_scene;
+	// Check if any of child Resource propery is_local_to_scene
+	// (eg MeshInstance --> Material --> ViewporTexture)
+	List<PropertyInfo> plist;
+	get_property_list(&plist);
+	for (List<PropertyInfo>::Element *E = plist.front(); E; E = E->next()) {
+		if (E->get().type == Variant::OBJECT && E->get().hint == PROPERTY_HINT_RESOURCE_TYPE) {
+			RES res = get(E->get().name);
+			if (res.is_valid() && res->is_local_to_scene()) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 Node *Resource::get_local_scene() const {
