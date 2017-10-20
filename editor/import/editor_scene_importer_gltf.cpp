@@ -1987,7 +1987,17 @@ Spatial *EditorSceneImporterGLTF::_generate_scene(GLTFState &state, int p_bake_f
 		}
 	}
 
-	for (int i = 0; i < skeletons.size(); i++) {
+
+	for (int i = 0; i < state.skins.size(); i++) {
+		// Reorder godot's skeleton bones based on glTF's skin joints order
+		// since that's the value baked into Mesh's JOINTS_0 buffer
+		Map<int, int> bones_indeces_map;
+		for (int j = 0; j < state.skins[i].bones.size(); j++) {
+			GLTFNode *joint_node = state.nodes[state.skins[i].bones[j].node];
+			bones_indeces_map.insert(joint_node->godot_bone_index, j);
+			joint_node->godot_bone_index = j;
+		}
+		skeletons[i]->reorder_bones(bones_indeces_map);
 		skeletons[i]->localize_rests();
 	}
 
@@ -2068,7 +2078,7 @@ Node *EditorSceneImporterGLTF::import_scene(const String &p_path, uint32_t p_fla
 	if (err != OK)
 		return NULL;
 
-	/* STEP 7 PARSE TEXTURES */
+	/* STEP 7 PARSE MATERIALS */
 	err = _parse_materials(state);
 	if (err != OK)
 		return NULL;

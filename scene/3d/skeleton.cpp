@@ -499,6 +499,16 @@ void Skeleton::localize_rests() {
 	}
 }
 
+void Skeleton::reorder_bones(Map<int, int> &remap) {
+	Vector<Bone> tmp_bones = bones;
+	for (int i = 0; i < bones.size(); i++) {
+		int j = remap[i];
+		bones[j] = tmp_bones[i];
+		if (bones[j].parent >= 0)
+			bones[j].parent = remap[bones[j].parent];
+	}
+}
+
 void Skeleton::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("add_bone", "name"), &Skeleton::add_bone);

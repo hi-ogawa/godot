@@ -144,7 +144,9 @@ public:
 	void set_bone_custom_pose(int p_bone, const Transform &p_custom_pose);
 	Transform get_bone_custom_pose(int p_bone) const;
 
-	void localize_rests(); // used for loaders and tools
+	// used for loaders and tools
+	void localize_rests();
+	void reorder_bones(Map<int, int> &remap);
 
 	Skeleton();
 	~Skeleton();
